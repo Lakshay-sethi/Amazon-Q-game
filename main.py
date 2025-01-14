@@ -3,6 +3,53 @@ import random
 import math
 import os
 import time
+from asset_manager_optimized import GameAssetManager
+from dotenv import load_dotenv, dotenv_values 
+# loading variables from .env file
+load_dotenv()
+class Game:
+    def __init__(self):
+        pygame.init()
+        self.screen = pygame.display.set_mode((800, 400))
+        self.asset_manager = GameAssetManager()
+        self.assets = {}
+        
+    def show_loading_screen(self):
+        """Display loading screen while assets download"""
+        self.screen.fill((0, 0, 0))
+        font = pygame.font.Font(None, 36)
+        loading_text = font.render("Loading Game Assets...", True, (255, 255, 255))
+        text_rect = loading_text.get_rect(center=(WINDOW_WIDTH/2, WINDOW_HEIGHT/2))
+        self.screen.blit(loading_text, text_rect)
+        pygame.display.flip()
+
+
+    def load_assets(self):
+        """Load all game assets"""
+        cache_dir = 'local_assets'
+        
+        # Show loading screen
+        self.show_loading_screen()
+        
+        # Try to load from S3
+        if self.asset_manager.create_asset_cache(cache_dir):
+            # Load cached assets into pygame
+            for asset_file in os.listdir(cache_dir):
+                file_path = os.path.join(cache_dir, asset_file)
+                try:
+                    if asset_file.endswith(('.png', '.jpg', '.JPG')):
+                        self.assets[asset_file] = pygame.image.load(file_path).convert_alpha()
+                    elif asset_file.endswith(('.wav', '.mp3')):
+                        self.assets[asset_file] = pygame.mixer.Sound(file_path)
+                except pygame.error as e:
+                    print(f"Failed to load asset {asset_file}: {e}")
+        else:
+            print("Failed to load assets from S3, falling back to local assets")
+            self.load_local_assets()
+
+
+
+
 
 # Initialize Pygame
 pygame.init()
@@ -29,26 +76,45 @@ GRAY = (64, 64, 64)
 BROWN = (139, 69, 19)
 RED = (255, 0, 0)
 
+# Initialize game
+def test_s3_connection():
+    asset_manager = GameAssetManager()
+    if asset_manager.is_available():
+        assets = asset_manager.list_assets()
+        print("Found assets:", assets)
+    else:
+        print("S3 connection failed")
+
+# Add this to your main game initialization
+test_s3_connection()
+game = Game()
+    
+    # Upload assets to S3 (only need to do this once)
+    # game.upload_initial_assets('original_assets')
+    
+    # Load assets from S3 cache
+game.load_assets()
+
 # Load assets
 try:
     # Player and backgrounds
-    player_img = pygame.image.load(os.path.join('assets', 'hero.png'))
+    player_img = game.assets['hero.png']
     player_img = pygame.transform.scale(player_img, (40, 60))
     
-    background_img_1 = pygame.image.load(os.path.join('assets', 'day_background1.jpg'))
+    background_img_1 = game.assets['day_background1.jpg']
     background_img_1 = pygame.transform.scale(background_img_1, (WINDOW_WIDTH, WINDOW_HEIGHT))
     
-    background_img_2 = pygame.image.load(os.path.join('assets', 'night_background.jpg'))
+    background_img_2 = game.assets['night_background.JPG']
     background_img_2 = pygame.transform.scale(background_img_2, (WINDOW_WIDTH, WINDOW_HEIGHT))
     
     # Adversary
-    adversary_img = pygame.image.load(os.path.join('assets', 'witch.png'))
+    adversary_img = game.assets['witch.png']
     adversary_img = pygame.transform.scale(adversary_img, (50, 70))
     
-    heart_img = pygame.image.load(os.path.join('assets', 'heart.png'))
+    heart_img = game.assets['heart.png']
     heart_img = pygame.transform.scale(heart_img, (30, 30))
     
-    pothole_img = pygame.image.load(os.path.join('assets', 'pothole.png'))
+    pothole_img = game.assets['pothole.png']
     pothole_img = pygame.transform.scale(pothole_img, (pool_width, pool_height + 10))  # Making it slightly taller for depth effect
     
 except:
@@ -62,7 +128,7 @@ except:
 
 # Load sounds
 try:
-    jump_sound = pygame.mixer.Sound(os.path.join('assets', 'audio.mp3'))
+    jump_sound = game.assets['audio.mp3']
     #adversary_sound = pygame.mixer.Sound(os.path.join('assets', 'adversary.wav'))
     #level_complete_sound = pygame.mixer.Sound(os.path.join('assets', 'level_complete.wav'))
     # Sound to be played when cheating
@@ -199,9 +265,9 @@ class GameState:
 def change_background_music(level):
     pygame.mixer.music.stop()
     try:
-        pygame.mixer.music.load(os.path.join('assets', f'bckground.mp3'))
-        pygame.mixer.music.play(-1)  # -1 means loop indefinitely
-        pygame.mixer.music.set_volume(0.3) 
+        bck_music = game.assets['bckground.mp3']
+        bck_music.play(-1)  # -1 means loop indefinitely
+        bck_music.set_volume(0.3) 
     except:
         print(f"Couldn't load music for level {level}")
 
@@ -248,7 +314,7 @@ def show_start_screen():
     font_small = pygame.font.Font(None, 36)
     
     # Title
-    title = font_large.render("Water Jump Adventure", True, WHITE)
+    title = font_large.render("Choota Pandit Jump", True, WHITE)
     title_rect = title.get_rect(center=(WINDOW_WIDTH/2, WINDOW_HEIGHT/3))
     
     # Instructions
@@ -268,6 +334,8 @@ def show_start_screen():
                 if event.key == pygame.K_SPACE:
                     return True
     return False
+
+
 
 
 show_start_screen()
